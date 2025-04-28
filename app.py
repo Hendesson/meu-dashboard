@@ -8,6 +8,8 @@ import dash_bootstrap_components as dbc
 import dash_leaflet as dl
 from datetime import datetime
 
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+
 # Carregar dados
 excel_path = "banco_dados_climaticos_consolidado (2).xlsx"
 
@@ -278,4 +280,4 @@ def update_hw(cidade, ano_polar):
 
 # Rodar App
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run_server(host="0.0.0.0", port=8000, debug=False)
