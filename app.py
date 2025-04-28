@@ -280,6 +280,6 @@ def update_hw(cidade, ano_polar):
     return heatmap_fig, fig_polar, min_date, max_date, min_date, max_date
 
 # Rodar App
-import os
-if __name__ == "__main__":
-    app.run()
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))  # Use a porta do ambiente ou 5000 como padrão
+    app.run(host='0.0.0.0', port=port)  # O host p
