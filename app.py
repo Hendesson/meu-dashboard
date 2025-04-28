@@ -8,6 +8,7 @@ import dash_bootstrap_components as dbc
 import dash_leaflet as dl
 from datetime import datetime
 
+
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 # Carregar dados
@@ -282,4 +283,5 @@ def update_hw(cidade, ano_polar):
 import os
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
+    print(f"Iniciando servidor na porta {port}")  # Debug
     app.run(host="0.0.0.0", port=port, debug=False)
