@@ -10,6 +10,8 @@ from datetime import datetime
 
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app.title = "Dashboard de Ondas de Calor"
+print("Aplicativo WSGI inicializado:", app.server)  # Debug
 
 # Carregar dados
 excel_path = "banco_dados_climaticos_consolidado (2).xlsx"
@@ -281,7 +283,9 @@ def update_hw(cidade, ano_polar):
 
 # Rodar App
 # Rodar App com Gunicorn (não use app.run() em produção)
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))  # Use a porta do ambiente ou 5000 como padrão
-    app.run(host='0.0.0.0', port=port, debug=False)
+import os
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8050))
+    print(f"Iniciando servidor na porta {port}")  # Debug
+    app.run(host="0.0.0.0", port=port, debug=False)
 
