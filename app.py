@@ -279,5 +279,7 @@ def update_hw(cidade, ano_polar):
     return heatmap_fig, fig_polar, min_date, max_date, min_date, max_date
 
 # Rodar App
+import os
 if __name__ == "__main__":
-    app.run_server(host="0.0.0.0", port=8000, debug=False)
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host="0.0.0.0", port=port, debug=False)
