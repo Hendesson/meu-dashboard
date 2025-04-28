@@ -282,6 +282,4 @@ def update_hw(cidade, ano_polar):
 # Rodar App
 import os
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8050))
-    print(f"Iniciando servidor na porta {port}")  # Debug
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run()
