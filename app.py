@@ -99,20 +99,36 @@ app = dash.Dash(
 server = app.server
 app.title = "Dashboard de Ondas de Calor"
 
-# Inicialização dos processadores
+# Inicialização dos processadores (sem carregar dados ainda - lazy loading)
+# Isso permite que o servidor inicie rapidamente no Render
 try:
     data_processor = DataProcessor()
     visualizer = Visualizer()
     
-    # Carregamento dos dados
-    df = data_processor.load_data()
-    cidades = data_processor.cidades
-    anos = data_processor.anos
+    # Inicializa variáveis vazias - dados serão carregados nos callbacks quando necessário
+    df = pd.DataFrame()
+    cidades = []
+    anos = []
     
-    if df.empty:
-        logger.warning("DataFrame vazio após carregamento inicial")
-        cidades = []
-        anos = []
+    # Flag para indicar se dados já foram carregados
+    _data_loaded = False
+    
+    def _ensure_data_loaded():
+        """Carrega dados apenas quando necessário (lazy loading)"""
+        global df, cidades, anos, _data_loaded
+        if not _data_loaded and data_processor is not None:
+            try:
+                logger.info("Carregando dados (lazy loading)...")
+                df = data_processor.load_data()
+                cidades = data_processor.cidades
+                anos = data_processor.anos
+                _data_loaded = True
+                logger.info(f"Dados carregados: {len(df)} linhas, {len(cidades)} cidades")
+            except Exception as e:
+                logger.error(f"Erro ao carregar dados: {e}")
+                df = pd.DataFrame()
+                cidades = []
+                anos = []
 except Exception as e:
     logger.error(f"Erro ao inicializar processadores de dados: {e}")
     logger.exception("Detalhes do erro:")
@@ -122,6 +138,11 @@ except Exception as e:
     anos = []
     data_processor = None
     visualizer = Visualizer()
+    _data_loaded = False
+    
+    def _ensure_data_loaded():
+        """Função vazia se não houver processador"""
+        pass
 
 # ======================
 # Dados de Internações SRAG
@@ -334,10 +355,31 @@ def compute_thresholds_per_rm(serie_grp: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-df_srag = load_srag_series()
-df_srag_thresholds = compute_thresholds_per_rm(df_srag)
-rm_list = sorted(df_srag["RM_nome"].unique().tolist()) if not df_srag.empty else []
-anos_srag = sorted(df_srag["ano"].unique().tolist()) if not df_srag.empty else []
+# Carregamento lazy dos dados SRAG (somente quando necessário)
+df_srag = pd.DataFrame()
+df_srag_thresholds = pd.DataFrame()
+rm_list = []
+anos_srag = []
+_srag_data_loaded = False
+
+def _ensure_srag_data_loaded():
+    """Carrega dados SRAG apenas quando necessário (lazy loading)"""
+    global df_srag, df_srag_thresholds, rm_list, anos_srag, _srag_data_loaded
+    if not _srag_data_loaded:
+        try:
+            logger.info("Carregando dados SRAG (lazy loading)...")
+            df_srag = load_srag_series()
+            df_srag_thresholds = compute_thresholds_per_rm(df_srag)
+            rm_list = sorted(df_srag["RM_nome"].unique().tolist()) if not df_srag.empty else []
+            anos_srag = sorted(df_srag["ano"].unique().tolist()) if not df_srag.empty else []
+            _srag_data_loaded = True
+            logger.info(f"Dados SRAG carregados: {len(df_srag)} linhas")
+        except Exception as e:
+            logger.error(f"Erro ao carregar dados SRAG: {e}")
+            df_srag = pd.DataFrame()
+            df_srag_thresholds = pd.DataFrame()
+            rm_list = []
+            anos_srag = []
 
 # ======================
 # Dados de Internações SIH
@@ -1149,7 +1191,11 @@ app.layout = dbc.Container([
                 ], width=5),
                 dbc.Col([
                     html.Label("Cidade:"),
-                    dcc.Dropdown(cidades, cidades[0] if cidades else None, id="cidade-temp"),
+                    dcc.Dropdown(
+                        id="cidade-temp",
+                        options=[{"label": c, "value": c} for c in cidades] if cidades else [],
+                        value=cidades[0] if cidades else None
+                    ),
                     dcc.Loading(dcc.Graph(id="grafico-temp")),
                     dcc.Loading(dcc.Graph(id="grafico-umidade"))
                 ], width=7)
@@ -1386,6 +1432,9 @@ app.layout = dbc.Container([
      Input("slider-anos", "value")]
 )
 def update_temp(cidade, anos_selecionados):
+    # Carrega dados se ainda não foram carregados (lazy loading)
+    _ensure_data_loaded()
+    
     if not cidade or df.empty:
         return visualizer.create_temperature_plot(pd.DataFrame(), "", 0, 0), visualizer.create_umidity_plot(pd.DataFrame(), "", 0, 0)
     
@@ -1418,6 +1467,9 @@ def update_hw_total(cidade_total):
      Input("ano-hw", "value")]
 )
 def update_hw_annual(cidade, ano):
+    _ensure_data_loaded()
+    if df.empty:
+        return go.Figure()
     if not cidade or not ano or df.empty:
         return visualizer.create_polar_plot(pd.DataFrame(), "", 0), []
     
@@ -1466,6 +1518,9 @@ def toggle_calendar(n_clicks, current_style):
      Input("ano-hw", "value")]
 )
 def update_temp_hw_plot(cidade, ano):
+    _ensure_data_loaded()
+    if df.empty:
+        return go.Figure()
     if not cidade or not ano or df.empty:
         return visualizer.create_temperature_hw_plot(pd.DataFrame(), "", 0)
     
@@ -1476,6 +1531,9 @@ def update_temp_hw_plot(cidade, ano):
     [Input("cidade-hw", "value"), Input("ano-hw", "value")]
 )
 def update_ehf_hw_plot(cidade, ano):
+    _ensure_data_loaded()
+    if df.empty:
+        return go.Figure()
     if not cidade or not ano or df.empty:
         return go.Figure()
     dff = df[(df["cidade"] == cidade) & (df["year"] == ano)].copy()
@@ -1507,6 +1565,9 @@ def update_ehf_hw_plot(cidade, ano):
      Input("ano-hw", "value")]
 )
 def update_umidity_hw_plot(cidade, ano):
+    _ensure_data_loaded()
+    if df.empty:
+        return go.Figure()
     if not cidade or not ano or df.empty:
         return visualizer.create_umidity_hw_plot(pd.DataFrame(), "", 0)
     
