@@ -7,16 +7,49 @@ import os
 from data_processing import DataProcessor
 from visualization import Visualizer
 from cache_manager import cache_manager
+from config_paths import BASE_DIR, DATA_DIR, PROCESSED_DIR
 import calendar
 from typing import List, Dict
 import plotly.express as px
 import pandas as pd
 import plotly.graph_objs as go
 import numpy as np
+import logging
+
+# Configuração de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 try:
     import mapclassify as mc
 except Exception:
     mc = None
+
+def _load_map_html() -> str:
+    """
+    Carrega o conteúdo do mapa interativo HTML.
+    Tenta em BASE_DIR primeiro, depois em DATA_DIR.
+    """
+    # Tenta na raiz primeiro
+    map_path = os.path.join(BASE_DIR, 'mapa_interativo.html')
+    if os.path.exists(map_path):
+        try:
+            with open(map_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            logger.warning(f"Erro ao ler mapa da raiz: {e}")
+    
+    # Tenta em DATA_DIR
+    map_path = os.path.join(DATA_DIR, 'mapa_interativo.html')
+    if os.path.exists(map_path):
+        try:
+            with open(map_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            logger.warning(f"Erro ao ler mapa de data/: {e}")
+    
+    logger.warning("mapa_interativo.html não encontrado")
+    return '<html><body><p>Mapa não disponível</p></body></html>'
 
 def get_image_url(app, image_name: str) -> str:
     """
@@ -29,25 +62,25 @@ def get_image_url(app, image_name: str) -> str:
     Returns:
         URL da imagem (WebP ou original)
     """
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    from config_paths import IMAGES_WEBP_DIR, ASSETS_DIR
     
     # Tenta WebP primeiro (verifica se existe na pasta images/webp)
     webp_name = os.path.splitext(image_name)[0] + '.webp'
-    webp_path = os.path.join(current_dir, 'images', 'webp', webp_name)
+    webp_path = os.path.join(IMAGES_WEBP_DIR, webp_name)
     
     # Se WebP existe, copia para assets temporariamente ou usa caminho direto
     # Dash só serve arquivos de assets/, então vamos usar symlink ou copiar
     if os.path.exists(webp_path):
         # Cria link simbólico ou copia para assets se necessário
-        assets_webp = os.path.join(current_dir, 'assets', webp_name)
+        assets_webp = os.path.join(ASSETS_DIR, webp_name)
         if not os.path.exists(assets_webp):
             try:
                 # Tenta criar link simbólico (melhor para Windows e Linux)
                 if not os.path.islink(assets_webp):
                     import shutil
                     shutil.copy2(webp_path, assets_webp)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Erro ao copiar WebP para assets: {e}")
         
         if os.path.exists(assets_webp):
             return app.get_asset_url(webp_name)
@@ -67,13 +100,28 @@ server = app.server
 app.title = "Dashboard de Ondas de Calor"
 
 # Inicialização dos processadores
-data_processor = DataProcessor()
-visualizer = Visualizer()
-
-# Carregamento dos dados
-df = data_processor.load_data()
-cidades = data_processor.cidades
-anos = data_processor.anos
+try:
+    data_processor = DataProcessor()
+    visualizer = Visualizer()
+    
+    # Carregamento dos dados
+    df = data_processor.load_data()
+    cidades = data_processor.cidades
+    anos = data_processor.anos
+    
+    if df.empty:
+        logger.warning("DataFrame vazio após carregamento inicial")
+        cidades = []
+        anos = []
+except Exception as e:
+    logger.error(f"Erro ao inicializar processadores de dados: {e}")
+    logger.exception("Detalhes do erro:")
+    # Cria DataFrames vazios para não quebrar o app
+    df = pd.DataFrame()
+    cidades = []
+    anos = []
+    data_processor = None
+    visualizer = Visualizer()
 
 # ======================
 # Dados de Internações SRAG
@@ -113,12 +161,10 @@ def load_srag_series(csv_path: str = None) -> pd.DataFrame:
     """
     Carrega dados SRAG do arquivo Parquet (prioritário) ou CSV.
     """
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    
     # Tenta Parquet primeiro
-    parquet_path = os.path.join(current_dir, "processed", "RM_banco_SRAG.parquet")
+    parquet_path = os.path.join(PROCESSED_DIR, "RM_banco_SRAG.parquet")
     if csv_path is None:
-        csv_path = os.path.join(current_dir, "RM_banco_SRAG.csv")
+        csv_path = os.path.join(DATA_DIR, "RM_banco_SRAG.csv")
     
     # Tenta carregar do cache
     cache_key = f"srag_series_{os.path.getmtime(parquet_path) if os.path.exists(parquet_path) else (os.path.getmtime(csv_path) if os.path.exists(csv_path) else 0)}"
@@ -138,7 +184,7 @@ def load_srag_series(csv_path: str = None) -> pd.DataFrame:
             print(f"Erro ao carregar Parquet: {e}")
     
     # Fallback para CSV agregado
-    agg_cache_path = os.path.join(current_dir, "RM_banco_SRAG_agg.csv")
+    agg_cache_path = os.path.join(PROCESSED_DIR, "RM_banco_SRAG_agg.csv")
     try:
         if os.path.exists(agg_cache_path):
             df = pd.read_csv(agg_cache_path, parse_dates=["data"], encoding="utf-8")
@@ -238,14 +284,13 @@ def load_srag_series(csv_path: str = None) -> pd.DataFrame:
 
     # Salva cache para próximos carregamentos
     try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
+        os.makedirs(PROCESSED_DIR, exist_ok=True)
         serie_grp.to_csv(agg_cache_path, index=False, encoding="utf-8")
         # Também salva como Parquet
-        parquet_path = os.path.join(current_dir, "processed", "RM_banco_SRAG_agg.parquet")
-        os.makedirs(os.path.dirname(parquet_path), exist_ok=True)
+        parquet_path = os.path.join(PROCESSED_DIR, "RM_banco_SRAG_agg.parquet")
         serie_grp.to_parquet(parquet_path, engine='pyarrow', compression='snappy', index=False)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Erro ao salvar cache SRAG: {e}")
     
     # Salva no cache em memória
     cache_key = f"srag_series_{os.path.getmtime(csv_path) if os.path.exists(csv_path) else 0}"
@@ -302,12 +347,10 @@ def load_sih_series(csv_path: str = None) -> pd.DataFrame:
     """
     Carrega dados SIH do arquivo Parquet (prioritário) ou CSV.
     """
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    
     # Tenta Parquet primeiro
-    parquet_path = os.path.join(current_dir, "processed", "serie_SIH_final.RData.parquet")
+    parquet_path = os.path.join(PROCESSED_DIR, "serie_SIH_final.RData.parquet")
     if csv_path is None:
-        csv_path = os.path.join(current_dir, "serie_SIH_final.RData.csv")
+        csv_path = os.path.join(DATA_DIR, "serie_SIH_final.RData.csv")
     
     # Tenta carregar do cache
     cache_key = f"sih_series_{os.path.getmtime(parquet_path) if os.path.exists(parquet_path) else (os.path.getmtime(csv_path) if os.path.exists(csv_path) else 0)}"
@@ -327,7 +370,7 @@ def load_sih_series(csv_path: str = None) -> pd.DataFrame:
             print(f"Erro ao carregar Parquet: {e}")
     
     # Fallback para CSV processado
-    processed_path = os.path.join(current_dir, "serie_SIH_final_processed.csv")
+    processed_path = os.path.join(PROCESSED_DIR, "serie_SIH_final_processed.csv")
     try:
         if os.path.exists(processed_path):
             df = pd.read_csv(processed_path, parse_dates=["data"], encoding="utf-8", sep=",")
@@ -340,8 +383,17 @@ def load_sih_series(csv_path: str = None) -> pd.DataFrame:
     print("Processando dados SIH...")
     
     if not os.path.exists(csv_path):
-        print(f"Arquivo não encontrado: {csv_path}")
-        return pd.DataFrame()
+        logger.warning(f"Arquivo CSV SIH não encontrado: {csv_path}")
+        logger.info(f"Tentando localizar em DATA_DIR: {DATA_DIR}")
+        # Tenta encontrar em DATA_DIR
+        csv_filename = os.path.basename(csv_path) if csv_path else "serie_SIH_final.RData.csv"
+        alt_csv_path = os.path.join(DATA_DIR, csv_filename)
+        if os.path.exists(alt_csv_path):
+            logger.info(f"Arquivo encontrado em DATA_DIR: {alt_csv_path}")
+            csv_path = alt_csv_path
+        else:
+            logger.error(f"Arquivo SIH não encontrado. Verifique se {csv_filename} está em {DATA_DIR}")
+            return pd.DataFrame()
 
     try:
         # Carrega o arquivo CSV original
@@ -1251,7 +1303,7 @@ app.layout = dbc.Container([
                             html.Div([
                                 html.Iframe(
                                     id="mapa-interativo",
-                                    srcDoc=open(r'C:\pibic_dash\mapa_interativo.html', 'r', encoding='utf-8').read(),
+                                    srcDoc=_load_map_html(),
                                     style={
                                         'width': '100%',
                                         'height': '600px',

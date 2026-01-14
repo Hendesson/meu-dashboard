@@ -9,11 +9,10 @@ from functools import lru_cache
 from typing import Any, Optional, Callable
 import pandas as pd
 import logging
+from config_paths import CACHE_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-CACHE_DIR = "cache"
 
 class CacheManager:
     """

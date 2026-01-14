@@ -5,6 +5,7 @@ import os
 import logging
 from typing import List, Dict, Optional, Tuple
 from cache_manager import cache_manager, cached_dataframe
+from config_paths import BASE_DIR, DATA_DIR, PROCESSED_DIR
 
 # Configuração do logging
 logging.basicConfig(
@@ -21,12 +22,9 @@ class DataProcessor:
         Args:
             file_path: Caminho opcional para o arquivo de dados. Se não fornecido, usa o caminho padrão.
         """
-        # Obtém o diretório atual do script
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        
         # Tenta usar Parquet primeiro, depois Excel
-        parquet_path = os.path.join(current_dir, "processed", "temp.parquet")
-        excel_path = file_path or os.path.join(current_dir, "temp.xlsx")
+        parquet_path = os.path.join(PROCESSED_DIR, "temp.parquet")
+        excel_path = file_path or os.path.join(DATA_DIR, "temp.xlsx")
         
         # Prioriza Parquet se existir
         if os.path.exists(parquet_path):
@@ -83,8 +81,17 @@ class DataProcessor:
             logger.info(f"Tentando carregar dados do arquivo: {self.file_path}")
             
             if not os.path.exists(self.file_path):
-                logger.error(f"Arquivo não encontrado: {self.file_path}")
-                return pd.DataFrame()
+                logger.warning(f"Arquivo não encontrado: {self.file_path}")
+                logger.info(f"Tentando localizar arquivo em DATA_DIR: {DATA_DIR}")
+                # Tenta encontrar em DATA_DIR
+                filename = os.path.basename(self.file_path)
+                alt_path = os.path.join(DATA_DIR, filename)
+                if os.path.exists(alt_path):
+                    logger.info(f"Arquivo encontrado em DATA_DIR: {alt_path}")
+                    self.file_path = alt_path
+                else:
+                    logger.error(f"Arquivo não encontrado em nenhum local. Verifique se {filename} está em {DATA_DIR}")
+                    return pd.DataFrame()
             
             # Tenta carregar do cache primeiro
             cache_key = f"main_data_{os.path.getmtime(self.file_path) if os.path.exists(self.file_path) else 0}"

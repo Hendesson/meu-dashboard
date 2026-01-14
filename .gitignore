@@ -38,10 +38,15 @@ ENV/
 Thumbs.db
 
 # Dados originais (não enviar para Git - use Parquet)
+# Mas permitir arquivos em data/ para deploy
 *.xlsx
 *.xls
 *.csv
 !requirements.txt
+!data/*.xlsx
+!data/*.xls
+!data/*.csv
+!data/*.html
 
 # Cache
 cache/
@@ -51,10 +56,12 @@ cache/
 # Logs
 *.log
 
-# Arquivos temporários
+# Arquivos temporários (mas permitir em data/)
 temp.xlsx
 temp1.xlsx
 *.tmp
+!data/temp.xlsx
+!data/temp1.xlsx
 
 # Arquivos de backup
 *.bak

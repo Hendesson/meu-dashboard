@@ -6,6 +6,7 @@ import numpy as np
 import os
 from pathlib import Path
 import logging
+from config_paths import DATA_DIR, PROCESSED_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -39,17 +40,26 @@ def optimize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def convert_excel_to_parquet(excel_path: str, output_dir: str = "processed") -> str:
+def convert_excel_to_parquet(excel_path: str, output_dir: str = None) -> str:
     """
     Converte um arquivo Excel para Parquet com otimização.
     
     Args:
         excel_path: Caminho do arquivo Excel
-        output_dir: Diretório de saída
+        output_dir: Diretório de saída (None = usa PROCESSED_DIR)
         
     Returns:
         Caminho do arquivo Parquet gerado
     """
+    if output_dir is None:
+        output_dir = PROCESSED_DIR
+    
+    # Se excel_path é relativo, tenta encontrar em DATA_DIR
+    if not os.path.isabs(excel_path) and not os.path.exists(excel_path):
+        alt_path = os.path.join(DATA_DIR, excel_path)
+        if os.path.exists(alt_path):
+            excel_path = alt_path
+    
     if not os.path.exists(excel_path):
         logger.error(f"Arquivo não encontrado: {excel_path}")
         return None
@@ -100,20 +110,29 @@ def convert_excel_to_parquet(excel_path: str, output_dir: str = "processed") -> 
         logger.error(f"Erro ao salvar Parquet: {e}")
         return None
 
-def convert_csv_to_parquet(csv_path: str, output_dir: str = "processed", 
+def convert_csv_to_parquet(csv_path: str, output_dir: str = None, 
                           usecols: list = None, dtype: dict = None) -> str:
     """
     Converte um arquivo CSV para Parquet com otimização.
     
     Args:
         csv_path: Caminho do arquivo CSV
-        output_dir: Diretório de saída
+        output_dir: Diretório de saída (None = usa PROCESSED_DIR)
         usecols: Lista de colunas a carregar
         dtype: Dicionário de tipos de dados
         
     Returns:
         Caminho do arquivo Parquet gerado
     """
+    if output_dir is None:
+        output_dir = PROCESSED_DIR
+    
+    # Se csv_path é relativo, tenta encontrar em DATA_DIR
+    if not os.path.isabs(csv_path) and not os.path.exists(csv_path):
+        alt_path = os.path.join(DATA_DIR, csv_path)
+        if os.path.exists(alt_path):
+            csv_path = alt_path
+    
     if not os.path.exists(csv_path):
         logger.error(f"Arquivo não encontrado: {csv_path}")
         return None
@@ -150,7 +169,7 @@ def convert_csv_to_parquet(csv_path: str, output_dir: str = "processed",
         return None
 
 if __name__ == "__main__":
-    # Converte arquivos Excel principais
+    # Converte arquivos Excel principais (procura em DATA_DIR)
     excel_files = [
         "temp.xlsx",
         "medias_HW_Severe_Extreme.xlsx",
@@ -158,10 +177,17 @@ if __name__ == "__main__":
     ]
     
     for excel_file in excel_files:
-        if os.path.exists(excel_file):
-            convert_excel_to_parquet(excel_file, "processed")
+        # Tenta em DATA_DIR primeiro
+        excel_path = os.path.join(DATA_DIR, excel_file)
+        if not os.path.exists(excel_path):
+            excel_path = excel_file  # Fallback para raiz
+        
+        if os.path.exists(excel_path):
+            convert_excel_to_parquet(excel_path)
+        else:
+            logger.warning(f"Arquivo não encontrado: {excel_file}")
     
-    # Converte CSVs principais
+    # Converte CSVs principais (procura em DATA_DIR)
     csv_files = [
         ("RM_banco_SRAG.csv", ["RM", "RM_nome", "DT_INTERNA", "DT_SIN_PRI", "mes", "ano"], 
          {"RM": "category", "RM_nome": "category", "mes": "category", "ano": "Int64"}),
@@ -170,8 +196,15 @@ if __name__ == "__main__":
     ]
     
     for csv_file, usecols, dtype in csv_files:
-        if os.path.exists(csv_file):
-            convert_csv_to_parquet(csv_file, "processed", usecols, dtype)
+        # Tenta em DATA_DIR primeiro
+        csv_path = os.path.join(DATA_DIR, csv_file)
+        if not os.path.exists(csv_path):
+            csv_path = csv_file  # Fallback para raiz
+        
+        if os.path.exists(csv_path):
+            convert_csv_to_parquet(csv_path, None, usecols, dtype)
+        else:
+            logger.warning(f"Arquivo não encontrado: {csv_file}")
     
     logger.info("Conversão concluída!")
 
