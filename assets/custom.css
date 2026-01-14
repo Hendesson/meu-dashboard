@@ -1,0 +1,239 @@
+body, .app-container, .dash-bootstrap {
+    background: linear-gradient(180deg, #eaf6fb 0%, #e3f7ee 100%);
+    min-height: 100vh;
+}
+
+.card, .dbc-card, .team-card {
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 4px 24px rgba(33, 140, 74, 0.08), 0 1.5px 8px rgba(23, 97, 160, 0.08);
+    border: 1.5px solid #b3d6e6;
+}
+
+.card-center {
+    border: 2.5px solid #6ec1a6;
+    box-shadow: 0 8px 32px rgba(33, 140, 74, 0.10), 0 2px 12px rgba(23, 97, 160, 0.10);
+}
+
+h3, h4, h5, .text-center.my-4 {
+    color: #1761a0;
+    text-shadow: 0 2px 8px #fff;
+    border-bottom: 2px solid #6ec1a6;
+    display: inline-block;
+    padding-bottom: 4px;
+    margin-bottom: 18px;
+    background: #fff;
+    border-radius: 6px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.btn-primary, .btn-outline-primary {
+    background: linear-gradient(90deg, #6ec1a6 0%, #b3d6e6 100%);
+    border: none;
+    color: #1761a0;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+.btn-primary:hover, .btn-outline-primary:hover {
+    background: linear-gradient(90deg, #b3d6e6 0%, #6ec1a6 100%);
+    color: #1761a0;
+}
+
+.btn-outline-danger {
+    border-color: #1761a0;
+    color: #1761a0;
+}
+.btn-outline-danger:hover {
+    background: #6ec1a6;
+    color: #fff;
+    border-color: #6ec1a6;
+}
+
+.dcc-tabs {
+    background: linear-gradient(90deg, #eaf6fb 0%, #e3f7ee 100%);
+    border-radius: 12px 12px 0 0;
+    padding: 0.5rem 1rem;
+}
+.dcc-tab {
+    background: transparent !important;
+    color: #1761a0 !important;
+    font-weight: 600;
+}
+.dcc-tab--selected {
+    background: #fff !important;
+    color: #1761a0 !important;
+    border-radius: 8px 8px 0 0;
+}
+
+.team-cards-container {
+    position: relative;
+    height: 500px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(120deg, #fff 60%, #eaf6fb 100%);
+    border-radius: 20px;
+    padding: 1.5rem 0;
+    overflow: visible;
+}
+
+.team-card {
+    position: absolute;
+    width: 320px;
+    height: 440px;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    padding: 20px;
+    margin: 0;
+    transition: all 0.5s cubic-bezier(.4,2,.6,1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.card-far-left {
+    transform: translateX(-220px) scale(0.7);
+    opacity: 0.3;
+    z-index: 1;
+}
+.card-left {
+    transform: translateX(-110px) scale(0.85);
+    opacity: 0.6;
+    z-index: 2;
+}
+.card-center {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+    z-index: 3;
+    pointer-events: auto;
+    border: 2.5px solid #6ec1a6;
+    box-shadow: 0 8px 32px rgba(33, 140, 74, 0.10), 0 2px 12px rgba(23, 97, 160, 0.10);
+}
+.card-right {
+    transform: translateX(110px) scale(0.85);
+    opacity: 0.6;
+    z-index: 2;
+}
+.card-far-right {
+    transform: translateX(220px) scale(0.7);
+    opacity: 0.3;
+    z-index: 1;
+}
+
+.team-card img, .logo-img {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px #b3d6e6;
+    padding: 8px;
+}
+
+.logo-img {
+    /* Use esta classe na logo principal */
+    max-height: 120px;
+    max-width: 220px;
+    margin: 20px 0;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px #b3d6e6;
+}
+
+.calendar-container {
+    background: linear-gradient(120deg, #fff 60%, #eaf6fb 100%);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px #b3d6e6;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.dash-leaflet-container {
+    border-radius: 16px;
+    box-shadow: 0 2px 8px #b3d6e6;
+    border: 2px solid #6ec1a6;
+}
+
+.calendar-day {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 2px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.calendar-day:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.heat-wave {
+    color: white !important;
+    font-weight: bold;
+}
+
+.heat-wave:hover {
+    filter: brightness(0.9);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.calendar-body {
+    margin-top: 1rem;
+}
+
+.calendar-header {
+    text-align: center;
+    margin-bottom: 1rem;
+    font-weight: bold;
+}
+
+.calendar-weekday {
+    text-align: center;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+/* Estilos para o popup */
+.popover-custom {
+    max-width: 300px;
+}
+
+.popover-custom .popover-body {
+    padding: 0;
+}
+
+.popover-custom h5 {
+    background-color: #ff4444;
+    color: white;
+    padding: 10px;
+    margin: 0;
+    border-radius: 5px 5px 0 0;
+}
+
+.popover-custom p {
+    padding: 8px 15px;
+    margin: 0;
+    border-bottom: 1px solid #eee;
+}
+
+.popover-custom p:last-child {
+    border-bottom: none;
+}
+
+/* Esconde as cartas que não estão entre as 5 principais */
+.team-card.hidden {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .team-card { width: 220px; height: 320px; }
+    .card-far-left, .card-far-right { transform: scale(0.5); opacity: 0.1; }
+    .card-left, .card-right { transform: scale(0.7); opacity: 0.3; }
+}

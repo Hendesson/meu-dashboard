@@ -1,0 +1,90 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+env/
+venv/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dados originais (não enviar para Git - use Parquet)
+*.xlsx
+*.xls
+*.csv
+!requirements.txt
+
+# Cache
+cache/
+*.pkl
+*.pickle
+
+# Logs
+*.log
+
+# Arquivos temporários
+temp.xlsx
+temp1.xlsx
+*.tmp
+
+# Arquivos de backup
+*.bak
+*.backup
+*.rar
+*.zip
+!pibic_dash*.rar
+
+# Arquivos R
+*.RData
+*.Rmd
+*.rmd
+
+# Shapefiles (manter apenas os necessários)
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.qix
+
+# Notebooks
+*.ipynb_checkpoints/
+*.ipynb
+
+# Configurações locais
+.env
+.env.local
+
+# Mas manter os processados!
+!processed/*.parquet
+!images/webp/*.webp
+
