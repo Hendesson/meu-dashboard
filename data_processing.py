@@ -112,8 +112,15 @@ class DataProcessor:
                 df = pd.read_parquet(self.file_path, engine='pyarrow')
                 logger.info(f"Dados Parquet lidos com sucesso. Shape: {df.shape}")
             else:
-                df = pd.read_excel(self.file_path)
-                logger.info(f"Dados Excel lidos com sucesso. Shape: {df.shape}")
+                # Usa engine openpyxl com read_only para arquivos grandes (mais rápido e usa menos memória)
+                try:
+                    df = pd.read_excel(self.file_path, engine='openpyxl')
+                    logger.info(f"Dados Excel lidos com sucesso. Shape: {df.shape}")
+                except Exception as e:
+                    logger.warning(f"Erro ao ler Excel com openpyxl: {e}. Tentando método alternativo...")
+                    # Fallback para método padrão
+                    df = pd.read_excel(self.file_path)
+                    logger.info(f"Dados Excel lidos com método alternativo. Shape: {df.shape}")
             
             # Processa apenas se necessário (Parquet já vem processado)
             if not self.use_parquet:
