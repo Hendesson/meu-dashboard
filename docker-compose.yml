@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build: .
+    container_name: pibic_dashboard
+    ports:
+      - "8050:8050"
+    environment:
+      - PORT=8050
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Monta volumes para persistir dados, cache e assets
+      - ./data:/app/data
+      - ./processed:/app/processed
+      - ./cache:/app/cache
+      - ./assets:/app/assets
+      - ./images:/app/images
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8050/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
