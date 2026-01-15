@@ -30,12 +30,23 @@ class Visualizer:
         """
         if df.empty:
             return go.Figure()
-            
+        
+        # Debug: verificar tipos e valores
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"DEBUG create_temperature_plot: cidade='{cidade}', anos={ano_inicio}-{ano_fim}, df.shape={df.shape}")
+        logger.info(f"  cidade dtype: {df['cidade'].dtype}, year dtype: {df['year'].dtype}")
+        
+        # Filtra dados
         dff = df[
             (df["cidade"] == cidade) & 
             (df["year"] >= ano_inicio) & 
             (df["year"] <= ano_fim)
         ]
+        
+        logger.info(f"  Linhas após filtro: {len(dff)}")
+        if len(dff) == 0:
+            logger.warning(f"  ⚠️ NENHUM DADO após filtro! Cidade: {len(df[df['cidade'] == cidade])}, Ano: {len(df[(df['year'] >= ano_inicio) & (df['year'] <= ano_fim)])}")
         
         fig = go.Figure()
         fig.add_trace(go.Scatter(

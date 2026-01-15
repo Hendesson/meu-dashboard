@@ -68,9 +68,8 @@ class DataProcessor:
             'Aracaju': 'SE',
             'Palmas': 'TO'
         }
-        # NÃO carrega dados no __init__ - será carregado sob demanda (lazy loading)
-        # Isso permite que o servidor inicie rapidamente no Render
-        # self.load_data()  # REMOVIDO para permitir inicialização rápida
+        # Carrega dados na inicialização (como era antes)
+        self.load_data()
 
     def load_data(self) -> pd.DataFrame:
         """
@@ -99,46 +98,117 @@ class DataProcessor:
             cache_key = f"main_data_{os.path.getmtime(self.file_path) if os.path.exists(self.file_path) else 0}"
             cached_df = cache_manager.get(cache_key)
             if cached_df is not None:
-                logger.info("Dados carregados do cache")
-                self.df = cached_df
-                self.cidades = sorted(cached_df["cidade"].unique())
-                self.anos = sorted(cached_df["year"].unique())
-                return cached_df
-            
-            logger.info("Arquivo encontrado, iniciando leitura...")
-            
-            # Carrega Parquet ou Excel
-            if self.use_parquet:
-                df = pd.read_parquet(self.file_path, engine='pyarrow')
-                logger.info(f"Dados Parquet lidos com sucesso. Shape: {df.shape}")
+                logger.info("Dados carregados do cache - processando tipos...")
+                # IMPORTANTE: Processa dados do cache também para garantir tipos corretos
+                df = cached_df.copy()
+                # Pula direto para o processamento (linha 108+)
             else:
-                # Usa engine openpyxl com read_only para arquivos grandes (mais rápido e usa menos memória)
-                try:
-                    df = pd.read_excel(self.file_path, engine='openpyxl')
-                    logger.info(f"Dados Excel lidos com sucesso. Shape: {df.shape}")
-                except Exception as e:
-                    logger.warning(f"Erro ao ler Excel com openpyxl: {e}. Tentando método alternativo...")
-                    # Fallback para método padrão
-                    df = pd.read_excel(self.file_path)
-                    logger.info(f"Dados Excel lidos com método alternativo. Shape: {df.shape}")
+                df = None
             
-            # Processa apenas se necessário (Parquet já vem processado)
-            if not self.use_parquet:
-                logger.info("Processando dados...")
-                df["index"] = pd.to_datetime(df["index"], errors="coerce")
-                if "isHW" in df.columns:
-                    df["isHW"] = df["isHW"].apply(lambda x: str(x).upper())
-                if "index" in df.columns:
-                    df["year"] = df["index"].dt.year
-                    df["month"] = df["index"].dt.month
+            # Se não veio do cache, carrega do arquivo
+            if df is None:
+                logger.info("Arquivo encontrado, iniciando leitura...")
                 
-                # Filtrar dados até 2023
-                if "year" in df.columns:
-                    df = df[df["year"] <= 2023]
+                # Carrega Parquet ou Excel
+                if self.use_parquet:
+                    df = pd.read_parquet(self.file_path, engine='pyarrow')
+                    logger.info(f"Dados Parquet lidos com sucesso. Shape: {df.shape}")
+                else:
+                    # Usa engine openpyxl com read_only para arquivos grandes (mais rápido e usa menos memória)
+                    try:
+                        df = pd.read_excel(self.file_path, engine='openpyxl')
+                        logger.info(f"Dados Excel lidos com sucesso. Shape: {df.shape}")
+                    except Exception as e:
+                        logger.warning(f"Erro ao ler Excel com openpyxl: {e}. Tentando método alternativo...")
+                        # Fallback para método padrão
+                        df = pd.read_excel(self.file_path)
+                        logger.info(f"Dados Excel lidos com método alternativo. Shape: {df.shape}")
+            
+            # Processa dados (tanto Parquet quanto Excel precisam de processamento)
+            logger.info("Processando dados...")
+            
+            # Garante que 'index' é datetime
+            if "index" in df.columns:
+                if not pd.api.types.is_datetime64_any_dtype(df["index"]):
+                    df["index"] = pd.to_datetime(df["index"], errors="coerce")
+                logger.info("Coluna 'index' convertida para datetime")
+            
+            # Garante que 'year' e 'month' existem
+            if "index" in df.columns:
+                if "year" not in df.columns or df["year"].isna().any():
+                    df["year"] = df["index"].dt.year
+                if "month" not in df.columns or df["month"].isna().any():
+                    df["month"] = df["index"].dt.month
+                logger.info("Colunas 'year' e 'month' criadas/atualizadas")
+            
+            # Garante que 'isHW' está no formato correto
+            if "isHW" in df.columns:
+                # Converte para string e uppercase, tratando todos os casos possíveis
+                # Pode vir como boolean, int, float, category, object, etc.
+                if df["isHW"].dtype == 'bool':
+                    # Se for boolean, converte True -> "TRUE", False -> "FALSE"
+                    df["isHW"] = df["isHW"].map({True: "TRUE", False: "FALSE"}).astype(str)
+                elif df["isHW"].dtype in ['int64', 'int32', 'float64', 'float32']:
+                    # Se for numérico, converte 1 -> "TRUE", 0 -> "FALSE"
+                    df["isHW"] = df["isHW"].map({1: "TRUE", 1.0: "TRUE", 0: "FALSE", 0.0: "FALSE"}).fillna("FALSE").astype(str)
+                else:
+                    # Se for category ou object, converte para string e uppercase
+                    df["isHW"] = df["isHW"].astype(str).str.upper()
+                    # Remove espaços e normaliza
+                    df["isHW"] = df["isHW"].str.strip()
+                    # Garante que valores vazios ou "nan" viram "FALSE"
+                    df["isHW"] = df["isHW"].replace(["", "nan", "NAN", "NONE", "NONE"], "FALSE")
+                
+                logger.info("Coluna 'isHW' formatada")
+                logger.info(f"  Valores únicos de isHW: {df['isHW'].unique()}")
+                logger.info(f"  Contagem TRUE: {len(df[df['isHW'] == 'TRUE'])}")
+                logger.info(f"  Contagem FALSE: {len(df[df['isHW'] == 'FALSE'])}")
+            
+            # IMPORTANTE: Converte colunas category de volta para tipos normais
+            # Isso é necessário porque comparações diretas (==, >=, <=) não funcionam bem com category
+            if "cidade" in df.columns:
+                if df["cidade"].dtype == 'category':
+                    df["cidade"] = df["cidade"].astype(str)
+                    logger.info("Coluna 'cidade' convertida de category para string")
+                # Remove espaços em branco e normaliza
+                df["cidade"] = df["cidade"].astype(str).str.strip()
+                # Remove valores NaN
+                df = df[df["cidade"].notna() & (df["cidade"] != "nan")]
+                logger.info("Coluna 'cidade' normalizada (sem espaços e NaN)")
+            
+            if "year" in df.columns:
+                # Converte year de category para int se necessário
+                if df["year"].dtype == 'category':
+                    df["year"] = df["year"].astype(str).astype(int)
+                elif not pd.api.types.is_integer_dtype(df["year"]):
+                    df["year"] = pd.to_numeric(df["year"], errors='coerce').astype('Int64')
+                # Remove valores NaN em year
+                df = df[df["year"].notna()]
+                logger.info("Coluna 'year' garantida como inteiro (sem NaN)")
+            
+            # Filtrar dados até 2023 (se year existir)
+            if "year" in df.columns:
+                antes = len(df)
+                df = df[df["year"] <= 2023]
+                depois = len(df)
+                if antes != depois:
+                    logger.info(f"Filtrados dados: {antes} -> {depois} linhas (apenas até 2023)")
             
             self.df = df
-            self.cidades = sorted(df["cidade"].unique())
-            self.anos = sorted(df["year"].unique())
+            
+            # Extrai cidades (já convertida para string acima)
+            if "cidade" in df.columns:
+                self.cidades = sorted(df["cidade"].unique().tolist())
+            else:
+                self.cidades = []
+                logger.warning("Coluna 'cidade' não encontrada no DataFrame")
+            
+            # Extrai anos (já convertida para int acima)
+            if "year" in df.columns:
+                self.anos = sorted([int(x) for x in df["year"].unique().tolist() if pd.notna(x)])
+            else:
+                self.anos = []
+                logger.warning("Coluna 'year' não encontrada no DataFrame")
             
             # Salva no cache
             cache_manager.set(cache_key, df, use_joblib=True)
@@ -151,6 +221,20 @@ class DataProcessor:
             logger.error(f"Erro ao carregar dados: {str(e)}")
             logger.exception("Detalhes do erro:")
             return pd.DataFrame()
+
+    def _normalize_isHW(self, series: pd.Series) -> pd.Series:
+        """
+        Normaliza a coluna isHW para garantir comparações corretas.
+        Converte para string uppercase e trata todos os casos possíveis.
+        """
+        if series.dtype == 'bool':
+            return series.map({True: "TRUE", False: "FALSE"}).astype(str)
+        elif series.dtype in ['int64', 'int32', 'float64', 'float32']:
+            return series.map({1: "TRUE", 1.0: "TRUE", 0: "FALSE", 0.0: "FALSE"}).fillna("FALSE").astype(str)
+        else:
+            normalized = series.astype(str).str.upper().str.strip()
+            normalized = normalized.replace(["", "nan", "NAN", "NONE", "NULL"], "FALSE")
+            return normalized
 
     @cached_dataframe(key_prefix="hw_monthly")
     def calculate_hw_monthly(self, cidade: str, ano: int) -> pd.DataFrame:
@@ -185,7 +269,14 @@ class DataProcessor:
         })
         
         # Calcula a frequência de ondas de calor por mês
-        monthly_counts = dff[dff["isHW"] == "TRUE"].groupby(dff["index"].dt.month).size().reset_index(name="frequencia")
+        # Normaliza isHW antes de filtrar
+        if "isHW" in dff.columns:
+            isHW_normalized = self._normalize_isHW(dff["isHW"])
+            hw_mask = isHW_normalized == "TRUE"
+        else:
+            hw_mask = pd.Series([False] * len(dff), index=dff.index)
+        
+        monthly_counts = dff[hw_mask].groupby(dff["index"].dt.month).size().reset_index(name="frequencia")
         monthly_counts.columns = ["month", "frequencia"]
         
         # Combina com todos os meses e preenche com 0 onde não há ondas de calor
@@ -233,7 +324,14 @@ class DataProcessor:
         })
         
         # Calcula a frequência de ondas de calor por mês
-        monthly_counts = dff[dff["isHW"] == "TRUE"].groupby(dff["index"].dt.month).size().reset_index(name="frequencia")
+        # Normaliza isHW antes de filtrar
+        if "isHW" in dff.columns:
+            isHW_normalized = self._normalize_isHW(dff["isHW"])
+            hw_mask = isHW_normalized == "TRUE"
+        else:
+            hw_mask = pd.Series([False] * len(dff), index=dff.index)
+        
+        monthly_counts = dff[hw_mask].groupby(dff["index"].dt.month).size().reset_index(name="frequencia")
         monthly_counts.columns = ["month", "frequencia"]
         
         # Combina com todos os meses e preenche com 0 onde não há ondas de calor
@@ -267,7 +365,12 @@ class DataProcessor:
         df_cidade_ano = df_cidade[df_cidade['index'].dt.year == ano].copy()
         
         # Identifica os dias de onda de calor (isHW == TRUE)
-        df_cidade_ano['isHW_bool'] = df_cidade_ano['isHW'] == "TRUE"
+        # Normaliza isHW antes de comparar
+        if "isHW" in df_cidade_ano.columns:
+            isHW_normalized = self._normalize_isHW(df_cidade_ano['isHW'])
+            df_cidade_ano['isHW_bool'] = isHW_normalized == "TRUE"
+        else:
+            df_cidade_ano['isHW_bool'] = False
         
         # Agrupa por períodos consecutivos de isHW_bool
         # Reseta o índice para garantir que a numeração do grupo seja sequencial após o filtro do ano
@@ -326,7 +429,12 @@ class DataProcessor:
         df_cidade = self.df[self.df['cidade'] == cidade].copy()
 
         # Identifica os dias de onda de calor (isHW == TRUE)
-        df_cidade['isHW_bool'] = df_cidade['isHW'] == "TRUE"
+        # Normaliza isHW antes de comparar
+        if "isHW" in df_cidade.columns:
+            isHW_normalized = self._normalize_isHW(df_cidade['isHW'])
+            df_cidade['isHW_bool'] = isHW_normalized == "TRUE"
+        else:
+            df_cidade['isHW_bool'] = False
         
         # Agrupa por períodos consecutivos de isHW_bool
         df_cidade['group'] = (df_cidade['isHW_bool'] != df_cidade['isHW_bool'].shift()).cumsum()
@@ -380,10 +488,16 @@ class DataProcessor:
             return []
             
         # Filtra apenas onde isHW é explicitamente 'TRUE'
-        return self.df[
-            (self.df['cidade'] == cidade) &
-            (self.df['isHW'] == "TRUE")
-        ]['index'].dt.date.tolist()
+        # Normaliza isHW antes de comparar
+        if "isHW" in self.df.columns:
+            isHW_normalized = self._normalize_isHW(self.df['isHW'])
+            hw_mask = isHW_normalized == "TRUE"
+            return self.df[
+                (self.df['cidade'] == cidade) &
+                hw_mask
+            ]['index'].dt.date.tolist()
+        else:
+            return []
 
     @cached_dataframe(key_prefix="heatmap_data")
     def prepare_heatmap_data(self) -> pd.DataFrame:
@@ -398,9 +512,14 @@ class DataProcessor:
             return pd.DataFrame()
             
         # Agrupa os dados por cidade e ano, contando apenas os dias que são ondas de calor
-        df_heatmap_days = self.df[
-            (self.df["isHW"] == "TRUE") # Filtra apenas dias de onda de calor
-        ].groupby(
+        # Normaliza isHW antes de filtrar
+        if "isHW" in self.df.columns:
+            isHW_normalized = self._normalize_isHW(self.df["isHW"])
+            hw_mask = isHW_normalized == "TRUE"
+        else:
+            hw_mask = pd.Series([False] * len(self.df), index=self.df.index)
+        
+        df_heatmap_days = self.df[hw_mask].groupby(
             ["cidade", "year"]
         ).size().reset_index(name="count") # Renomeia para 'count' para consistência com eventos
         
@@ -440,7 +559,12 @@ class DataProcessor:
         df_cidade = self.df[self.df['cidade'] == cidade].copy()
         
         # Identifica os dias de onda de calor (isHW == TRUE)
-        df_cidade['isHW_bool'] = df_cidade['isHW'] == "TRUE"
+        # Normaliza isHW antes de comparar
+        if "isHW" in df_cidade.columns:
+            isHW_normalized = self._normalize_isHW(df_cidade['isHW'])
+            df_cidade['isHW_bool'] = isHW_normalized == "TRUE"
+        else:
+            df_cidade['isHW_bool'] = False
         
         # Agrupa por períodos consecutivos de isHW_bool
         df_cidade['group'] = (df_cidade['isHW_bool'] != df_cidade['isHW_bool'].shift()).cumsum()
@@ -473,7 +597,12 @@ class DataProcessor:
         df_copy = self.df.copy()
 
         # Identifica os dias de onda de calor (isHW == TRUE)
-        df_copy['isHW_bool'] = df_copy['isHW'] == "TRUE"
+        # Normaliza isHW antes de comparar
+        if "isHW" in df_copy.columns:
+            isHW_normalized = self._normalize_isHW(df_copy['isHW'])
+            df_copy['isHW_bool'] = isHW_normalized == "TRUE"
+        else:
+            df_copy['isHW_bool'] = False
 
         # Ordena por cidade e data para garantir sequência correta
         df_copy = df_copy.sort_values(['cidade', 'index'])

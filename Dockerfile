@@ -35,5 +35,5 @@ ENV PORT=8050
 # - 1 worker: inicia mais rápido
 # - preload: carrega app antes de criar workers
 # - logs diretos: para Render ver o que está acontecendo
-CMD sh -c "gunicorn app:server --bind 0.0.0.0:${PORT:-8050} --workers 1 --timeout 120 --preload --access-logfile - --error-logfile - --log-level info"
+CMD sh -c "gunicorn app:server --bind 0.0.0.0:${PORT:-8050} --workers 1 --timeout 300 --graceful-timeout 30 --preload --access-logfile - --error-logfile - --log-level info"
 
