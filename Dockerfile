@@ -22,6 +22,10 @@ COPY . .
 # Cria os diretórios necessários se não existirem
 RUN mkdir -p data processed cache assets images/webp
 
+# Copia e torna executável o script de inicialização
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
 # Expõe a porta padrão do Dash
 EXPOSE 8050
 
@@ -29,8 +33,7 @@ EXPOSE 8050
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8050
 
-# Comando para executar a aplicação
-# Render define PORT automaticamente, mas usamos 8050 como fallback
-# O gunicorn vai usar a variável PORT do ambiente
-CMD sh -c "gunicorn app:server --bind 0.0.0.0:${PORT:-8050} --workers 2 --timeout 120"
+# Comando para executar a aplicação usando o script de inicialização
+# O script garante que o servidor inicie rapidamente para o Render detectar a porta
+CMD ["/start.sh"]
 

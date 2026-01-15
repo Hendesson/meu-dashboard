@@ -68,7 +68,9 @@ class DataProcessor:
             'Aracaju': 'SE',
             'Palmas': 'TO'
         }
-        self.load_data()
+        # NÃO carrega dados no __init__ - será carregado sob demanda (lazy loading)
+        # Isso permite que o servidor inicie rapidamente no Render
+        # self.load_data()  # REMOVIDO para permitir inicialização rápida
 
     def load_data(self) -> pd.DataFrame:
         """
