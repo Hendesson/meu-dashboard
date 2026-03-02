@@ -1,0 +1,11 @@
+.Rhistory
+.RData
+*.RData
+__pycache__/
+.git/
+.venv/
+venv/
+env/
+site/
+*.html
+
